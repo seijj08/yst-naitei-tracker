@@ -644,10 +644,15 @@ function loadSample(){
 
 /* ================= persistence & GitHub sync ================= */
 function save(){ localStorage.setItem(LS_DATA,JSON.stringify(DATA)); }
-function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none',2500); }
+function toast(msg,ms=2500){ const el=document.getElementById('toast'); el.textContent=msg; el.style.display='block'; clearTimeout(el._t); el._t=setTimeout(()=>el.style.display='none',ms); }
 function setBadge(txt,cls){ const b=document.getElementById('syncBadge'); b.textContent=txt; b.className=cls||''; }
 
-function b64encode(str){ return btoa(String.fromCharCode(...new TextEncoder().encode(str))); }
+function b64encode(str){
+  const u=new TextEncoder().encode(str); let s='';
+  for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));
+  return btoa(s);
+}
+let LAST_ERR='';
 function b64decode(b64){ return new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\n/g,'')),c=>c.charCodeAt(0))); }
 /* shared-edit (demo) : token is stored lightly encoded inside data.json so every viewer can write */
 function encT(t){ return btoa(t).split('').reverse().join(''); }
@@ -712,7 +717,8 @@ async function syncPull(){
     const {data}=await ghFetch();
     DATA=mergeData(data,DATA); rawSave(); safeRender();
     setBadge(canWrite()? (CFG.token?'同期済 ':'同期済(共有) ')+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) : '閲覧モード','ok');
-  }catch(e){ console.error(e); setBadge('同期失敗','err'); toast('同期に失敗しました: '+e.message); }
+    LAST_ERR='';
+  }catch(e){ console.error(e); LAST_ERR='取得時: '+e.message; setBadge('同期失敗','err'); toast('同期に失敗しました: '+e.message,7000); }
 }
 
 async function syncPush(){
@@ -733,8 +739,9 @@ async function syncPush(){
     const res=await fetch(ghUrl().split('?')[0],{method:'PUT',headers:{...ghHeaders(),'Content-Type':'application/json'},body:JSON.stringify(body)});
     if(res.status===409){ SYNCING=false; return syncPush(); } // sha conflict → retry with fresh sha
     if(!res.ok) throw new Error('GitHub保存エラー '+res.status);
-    setBadge('同期済 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),'ok');
-  }catch(e){ console.error(e); setBadge('同期失敗','err'); toast('保存の同期に失敗: '+e.message+'（データは端末に保存済み）'); }
+    setBadge((CFG.token?'同期済 ':'同期済(共有) ')+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),'ok');
+    LAST_ERR='';
+  }catch(e){ console.error(e); LAST_ERR='保存時: '+e.message; setBadge('同期失敗','err'); toast('保存の同期に失敗: '+e.message+'（データは端末に保存済み）',7000); }
   finally{ SYNCING=false; }
 }
 
@@ -758,6 +765,7 @@ function openSettings(){
   document.getElementById('ghPath').value=CFG.path;
   document.getElementById('ghToken').value=CFG.token;
   document.getElementById('sharedStatus').textContent = DATA.sharedKey? '現在：ON（全員が編集可能）' : '現在：OFF（トークン設定済みの端末のみ編集可能）';
+  document.getElementById('diagOut').innerHTML = LAST_ERR? '⚠ 前回の同期エラー: '+LAST_ERR : '';
   document.getElementById('settingsModal').classList.add('open');
 }
 async function enableShared(){
@@ -796,8 +804,19 @@ async function runDiag(){
   if(ares.status===401){ add(false,'このトークンは無効です → コピーミス、またはRegenerate後の古いトークンの可能性。GitHubで再発行して貼り直してください'); return; }
   if(!ares.ok){ add(false,`トークン確認でエラー ${ares.status}`); return; }
   const j=await ares.json();
-  if(j.permissions&&j.permissions.push) add(true,'トークン有効・書き込み権限OK！このまま「保存して同期」を押せば完了です');
-  else add(false,'トークンは有効ですが書き込み権限がありません → トークン設定で「Only select repositories」にこのリポジトリが選ばれているか、Contents が Read and write かを確認してください');
+  if(j.permissions&&j.permissions.push) add(true,'トークン有効・書き込み権限OK');
+  else{ add(false,'トークンは有効ですが書き込み権限がありません → トークン設定で「Only select repositories」にこのリポジトリが選ばれているか、Contents が Read and write かを確認してください'); return; }
+  /* ここから実際の同期を実行して、失敗する正確な箇所を特定する */
+  CFG={owner:o,repo:r,branch:b,path:p,token:t};
+  localStorage.setItem(LS_CFG,JSON.stringify(CFG));
+  add(true,'設定を保存しました。実際の同期を実行します…');
+  LAST_ERR='';
+  await syncPull();
+  if(LAST_ERR){ add(false,'【実際の読み込みで失敗】'+LAST_ERR); return; }
+  add(true,'実際の読み込み成功（'+DATA.candidates.length+'名分のデータ）');
+  await syncPush();
+  if(LAST_ERR){ add(false,'【実際の保存で失敗】'+LAST_ERR); return; }
+  add(true,'実際の保存も成功！同期は完全に復旧しています🎉');
 }
 function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
 function saveSettings(){

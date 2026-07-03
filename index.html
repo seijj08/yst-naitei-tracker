@@ -140,7 +140,7 @@ footer{text-align:center;color:var(--sub);font-size:11px;padding:20px}
 <div class="modal-bg" id="settingsModal">
   <div class="modal">
     <h3>同期設定（GitHub）</h3>
-    <p class="muted" style="margin-bottom:12px">リポジトリ内の <b>data.json</b> をGitHub APIで読み書きします。保存前に必ず最新データを取得してマージするため、複数端末で使っても上書き消失しません。</p>
+    <p class="muted" style="margin-bottom:12px">リポジトリ内の <b>data.json</b> をGitHub APIで読み書きします。<b>閲覧はトークン不要</b>（URLを開くだけで最新データが表示されます）。入力・編集を全体に反映するにはトークンが必要です。</p>
     <div class="grid2">
       <div class="field"><label>Owner（ユーザー名）</label><input id="ghOwner" placeholder="tomomaeda-v"></div>
       <div class="field"><label>リポジトリ名</label><input id="ghRepo" placeholder="yst-naitei-tracker"></div>
@@ -151,6 +151,15 @@ footer{text-align:center;color:var(--sub);font-size:11px;padding:20px}
     </div>
     <div class="field"><label>アクセストークン（Fine-grained PAT / Contents: Read&Write）</label><input id="ghToken" type="password" placeholder="github_pat_..."></div>
     <p class="muted">トークンはこの端末のブラウザにのみ保存されます。候補者の端末には、このリポジトリだけに限定したトークンを設定してください。</p>
+    <div style="border-top:1px solid var(--line);margin:14px 0;padding-top:12px">
+      <label>全員編集モード（デモ用・一時的）</label>
+      <p class="muted" id="sharedStatus" style="margin-bottom:8px"></p>
+      <p class="muted" style="margin-bottom:8px">⚠ ONにすると、URLを知っている人は<b>誰でも</b>設定なしでデータを編集・削除できます。デモが終わったら必ずOFFに戻し、トークンを再発行してください。</p>
+      <div class="btnrow">
+        <button class="btn ghost" onclick="enableShared()">ONにする</button>
+        <button class="btn danger" onclick="disableShared()">OFFにする</button>
+      </div>
+    </div>
     <div class="btnrow">
       <button class="btn" onclick="saveSettings()">保存して同期</button>
       <button class="btn ghost" onclick="loadSample()">サンプルデータ読込</button>
@@ -168,7 +177,8 @@ footer{text-align:center;color:var(--sub);font-size:11px;padding:20px}
 /* ================= state ================= */
 const LS_DATA='yst_naitei_data', LS_CFG='yst_naitei_cfg', LS_MODE='yst_naitei_mode', LS_SELFID='yst_naitei_selfid', LS_LANG='yst_naitei_lang';
 let DATA = JSON.parse(localStorage.getItem(LS_DATA)||'null') || {updatedAt:null, candidates:[]};
-let CFG  = JSON.parse(localStorage.getItem(LS_CFG)||'null')  || {owner:'',repo:'',branch:'main',path:'data.json',token:''};
+const DEFAULT_CFG={owner:'seijj08',repo:'yst-naitei-tracker',branch:'main',path:'data.json',token:''};
+let CFG  = {...DEFAULT_CFG, ...JSON.parse(localStorage.getItem(LS_CFG)||'{}')};
 let MODE = localStorage.getItem(LS_MODE)||'staff';
 let LANG = localStorage.getItem(LS_LANG)||'id';
 let VIEW = {page:'dash', cid:null};
@@ -637,13 +647,23 @@ function setBadge(txt,cls){ const b=document.getElementById('syncBadge'); b.text
 
 function b64encode(str){ return btoa(String.fromCharCode(...new TextEncoder().encode(str))); }
 function b64decode(b64){ return new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\n/g,'')),c=>c.charCodeAt(0))); }
+/* shared-edit (demo) : token is stored lightly encoded inside data.json so every viewer can write */
+function encT(t){ return btoa(t).split('').reverse().join(''); }
+function decT(e){ try{ return atob(e.split('').reverse().join('')); }catch(_){ return ''; } }
+function effectiveToken(){ return CFG.token || (DATA.sharedKey? decT(DATA.sharedKey) : ''); }
 function ghUrl(){ return `https://api.github.com/repos/${CFG.owner}/${CFG.repo}/contents/${CFG.path}?ref=${CFG.branch}`; }
-function ghHeaders(){ return {Authorization:'Bearer '+CFG.token, Accept:'application/vnd.github+json'}; }
-function cfgOk(){ return CFG.owner&&CFG.repo&&CFG.token; }
+function ghHeaders(){ const h={Accept:'application/vnd.github+json'}; const t=effectiveToken(); if(t) h.Authorization='Bearer '+t; return h; }
+function canRead(){ return !!(CFG.owner&&CFG.repo); }
+function canWrite(){ return canRead() && !!effectiveToken(); }
 
 async function ghFetch(){
   const res=await fetch(ghUrl(),{headers:ghHeaders(),cache:'no-store'});
   if(res.status===404) return {sha:null,data:{updatedAt:null,candidates:[]}};
+  if(res.status===403 && !effectiveToken()){
+    // unauthenticated API rate limit → fall back to raw (may be a few minutes stale)
+    const raw=await fetch(`https://raw.githubusercontent.com/${CFG.owner}/${CFG.repo}/${CFG.branch}/${CFG.path}?t=${Date.now()}`,{cache:'no-store'});
+    if(raw.ok) return {sha:null, data:await raw.json()};
+  }
   if(!res.ok) throw new Error('GitHub取得エラー '+res.status);
   const j=await res.json();
   return {sha:j.sha, data:JSON.parse(b64decode(j.content))};
@@ -677,21 +697,28 @@ function mergeData(remote, local){
     merged.mockTests=[...mmap.values()];
     map.set(lc.id,merged);
   });
-  return {updatedAt:new Date().toISOString(), candidates:[...map.values()]};
+  return {updatedAt:new Date().toISOString(), candidates:[...map.values()],
+    ...( (local.sharedAt||'') >= (remote.sharedAt||'')
+       ? {sharedKey:local.sharedKey||null, sharedAt:local.sharedAt||null}
+       : {sharedKey:remote.sharedKey||null, sharedAt:remote.sharedAt||null} )};
 }
 
 async function syncPull(){
-  if(!cfgOk()){ setBadge('未設定'); return; }
+  if(!canRead()){ setBadge('未設定'); return; }
   try{
     setBadge('同期中…');
     const {data}=await ghFetch();
     DATA=mergeData(data,DATA); rawSave(); safeRender();
-    setBadge('同期済 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),'ok');
+    setBadge(canWrite()? (CFG.token?'同期済 ':'同期済(共有) ')+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) : '閲覧モード','ok');
   }catch(e){ console.error(e); setBadge('同期失敗','err'); toast('同期に失敗しました: '+e.message); }
 }
 
 async function syncPush(){
-  if(!cfgOk()||SYNCING) return;
+  if(!canWrite()){
+    if(canRead()){ setBadge('閲覧モード','ok'); toast('編集内容はこの端末のみに保存されました。全体に反映するには⚙設定でトークンを入力してください'); }
+    return;
+  }
+  if(SYNCING) return;
   SYNCING=true;
   try{
     setBadge('保存中…');
@@ -728,7 +755,18 @@ function openSettings(){
   document.getElementById('ghBranch').value=CFG.branch;
   document.getElementById('ghPath').value=CFG.path;
   document.getElementById('ghToken').value=CFG.token;
+  document.getElementById('sharedStatus').textContent = DATA.sharedKey? '現在：ON（全員が編集可能）' : '現在：OFF（トークン設定済みの端末のみ編集可能）';
   document.getElementById('settingsModal').classList.add('open');
+}
+async function enableShared(){
+  if(!CFG.token){ toast('先にこの端末のトークン欄を入力・保存してください'); return; }
+  if(!confirm('URLを知っている全員が編集できるようになります。デモ用に一時的にONにしますか？')) return;
+  DATA.sharedKey=encT(CFG.token); DATA.sharedAt=new Date().toISOString();
+  rawSave(); await syncPush(); openSettings(); toast('全員編集モードをONにしました');
+}
+async function disableShared(){
+  DATA.sharedKey=null; DATA.sharedAt=new Date().toISOString();
+  rawSave(); await syncPush(); openSettings(); toast('全員編集モードをOFFにしました。トークンの再発行を推奨します');
 }
 function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
 function saveSettings(){
@@ -742,7 +780,7 @@ function saveSettings(){
 /* ================= init ================= */
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
 render();
-if(cfgOk()) syncPull();
+if(canRead()) syncPull();
 </script>
 </body>
 </html>

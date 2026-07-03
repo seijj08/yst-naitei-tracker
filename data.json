@@ -1,28 +1,47 @@
 {
-  "updatedAt": "2026-07-03T12:29:42.893Z",
+  "updatedAt": "2026-07-03T14:06:29.616Z",
   "candidates": [
     {
       "id": "xmr4wk3qca44nu",
-      "name": "",
+      "name": "イクバル",
       "code": "",
-      "company": "sa",
+      "company": "エコランド",
       "sector": "ドライバー",
       "naiteiDate": "2026-07-03",
       "entryPlan": "",
-      "notes": "",
+      "notes": "テスト",
       "ssw": {
         "passed": false,
         "nextDate": "",
         "attempts": []
       },
       "reports": [],
-      "updatedAt": "2026-07-03T12:22:08.075Z"
+      "updatedAt": "2026-07-03T13:46:40.572Z",
+      "mockTests": []
     },
     {
       "id": "xmr4wulchajfuk",
-      "name": "",
+      "name": "チプタ",
       "code": "",
-      "company": "",
+      "company": "エコランド",
+      "sector": "ドライバー",
+      "naiteiDate": "2026-07-03",
+      "entryPlan": "",
+      "notes": "手",
+      "ssw": {
+        "passed": false,
+        "nextDate": "",
+        "attempts": []
+      },
+      "reports": [],
+      "updatedAt": "2026-07-03T13:47:12.725Z",
+      "mockTests": []
+    },
+    {
+      "id": "xmr4ytdp0dl2g2",
+      "name": "エルウィン",
+      "code": "",
+      "company": "サンウエイ",
       "sector": "ドライバー",
       "naiteiDate": "2026-07-03",
       "entryPlan": "",
@@ -33,7 +52,26 @@
         "attempts": []
       },
       "reports": [],
-      "updatedAt": "2026-07-03T12:29:32.945Z"
+      "updatedAt": "2026-07-03T13:24:49.112Z"
+    },
+    {
+      "id": "xmr4yu2uoyc2bx",
+      "name": "ナナン",
+      "code": "",
+      "company": "サンウエイ",
+      "sector": "ドライバー",
+      "naiteiDate": "2026-07-03",
+      "entryPlan": "",
+      "notes": "",
+      "ssw": {
+        "passed": false,
+        "nextDate": "",
+        "attempts": []
+      },
+      "reports": [],
+      "updatedAt": "2026-07-03T13:25:16.696Z"
     }
-  ]
+  ],
+  "sharedKey": "RZXSCljSyskRKZzRyokQEFleWhUZzQ3Yxc2TBZmTIRFa0RkWLtEORV2NEdGaRx0QPxWdkRWOMp3Tr52Xh1mVnt2ZzgzM4JmSwkVNQFlMHNUMx8FdhB3XiVHa0l2Z",
+  "sharedAt": "2026-07-03T13:42:46.198Z"
 }

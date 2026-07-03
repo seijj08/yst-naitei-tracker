@@ -150,6 +150,8 @@ footer{text-align:center;color:var(--sub);font-size:11px;padding:20px}
       <div class="field"><label>ファイルパス</label><input id="ghPath" placeholder="data.json" value="data.json"></div>
     </div>
     <div class="field"><label>アクセストークン（Fine-grained PAT / Contents: Read&Write）</label><input id="ghToken" type="password" placeholder="github_pat_..."></div>
+    <div class="btnrow" style="margin-top:0;margin-bottom:10px"><button class="btn ghost" onclick="runDiag()">🔍 接続診断（原因を自動チェック）</button></div>
+    <p class="muted" id="diagOut" style="margin-bottom:10px;line-height:1.9"></p>
     <p class="muted">トークンはこの端末のブラウザにのみ保存されます。候補者の端末には、このリポジトリだけに限定したトークンを設定してください。</p>
     <div style="border-top:1px solid var(--line);margin:14px 0;padding-top:12px">
       <label>全員編集モード（デモ用・一時的）</label>
@@ -767,6 +769,35 @@ async function enableShared(){
 async function disableShared(){
   DATA.sharedKey=null; DATA.sharedAt=new Date().toISOString();
   rawSave(); await syncPush(); openSettings(); toast('全員編集モードをOFFにしました。トークンの再発行を推奨します');
+}
+
+/* connection diagnosis: checks each layer and reports the exact cause in plain language */
+async function runDiag(){
+  const out=document.getElementById('diagOut');
+  const o=document.getElementById('ghOwner').value.trim(), r=document.getElementById('ghRepo').value.trim(),
+        b=document.getElementById('ghBranch').value.trim()||'main', p=document.getElementById('ghPath').value.trim()||'data.json',
+        t=document.getElementById('ghToken').value.trim();
+  const lines=[]; const add=(ok,msg)=>{ lines.push((ok?'✅ ':'❌ ')+msg); out.innerHTML=lines.join('<br>'); };
+  out.innerHTML='診断中…';
+  if(!o||!r){ lines.length=0; add(false,'Ownerまたはリポジトリ名が空欄です'); return; }
+  lines.length=0;
+  try{
+    const res=await fetch(`https://api.github.com/repos/${o}/${r}`,{cache:'no-store'});
+    if(res.status===404){ add(false,`リポジトリ「${o}/${r}」が見つかりません → Owner（jの数など）かリポジトリ名のスペルを確認してください`); return; }
+    if(!res.ok){ add(false,`リポジトリ確認でエラー ${res.status}（時間をおいて再試行してください）`); return; }
+    add(true,`リポジトリ「${o}/${r}」は存在します`);
+  }catch(e){ add(false,'GitHubに接続できません → インターネット接続、社内ネットワークの制限を確認してください'); return; }
+  const fres=await fetch(`https://api.github.com/repos/${o}/${r}/contents/${encodeURIComponent(p)}?ref=${b}`,{cache:'no-store'});
+  if(fres.status===404) add(false,`ブランチ「${b}」に「${p}」が見つかりません → ブランチ名とファイルパスを確認してください`);
+  else if(fres.ok) add(true,`「${p}」の読み取りOK（データの閲覧は可能です）`);
+  else add(false,`「${p}」の読み取りでエラー ${fres.status}`);
+  if(!t){ add(false,'トークンが未入力です → 閲覧のみ可能。編集にはトークンを貼り付けて「保存して同期」してください'); return; }
+  const ares=await fetch(`https://api.github.com/repos/${o}/${r}`,{headers:{Authorization:'Bearer '+t,Accept:'application/vnd.github+json'},cache:'no-store'});
+  if(ares.status===401){ add(false,'このトークンは無効です → コピーミス、またはRegenerate後の古いトークンの可能性。GitHubで再発行して貼り直してください'); return; }
+  if(!ares.ok){ add(false,`トークン確認でエラー ${ares.status}`); return; }
+  const j=await ares.json();
+  if(j.permissions&&j.permissions.push) add(true,'トークン有効・書き込み権限OK！このまま「保存して同期」を押せば完了です');
+  else add(false,'トークンは有効ですが書き込み権限がありません → トークン設定で「Only select repositories」にこのリポジトリが選ばれているか、Contents が Read and write かを確認してください');
 }
 function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
 function saveSettings(){

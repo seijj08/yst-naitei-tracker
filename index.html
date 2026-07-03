@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YST 内定者 学習進捗トラッカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F7F5; --card:#FFFFFF; --ink:#182430; --sub:#5B6B78; --line:#E2E6E3;
+  --green:#0E7C66; --green-soft:#E2F1ED; --amber:#B97914; --amber-soft:#FBF0DC;
+  --red:#C0442F; --red-soft:#F9E7E3; --gray-dot:#CBD3CE;
+  --radius:12px; --mono:'IBM Plex Mono',monospace;
+  font-family:'Noto Sans JP',"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--green);outline-offset:1px;border-color:var(--green)}
+label{font-size:12px;font-weight:700;color:var(--sub);display:block;margin-bottom:4px}
+.field{margin-bottom:12px}
+
+header{background:var(--ink);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
+header h1{font-size:16px;font-weight:900;letter-spacing:.02em}
+header h1 span{color:#7BC7B5;font-weight:500;font-size:12px;margin-left:8px}
+.spacer{flex:1}
+.mode-switch{display:flex;background:#2B3B49;border-radius:99px;padding:3px}
+.mode-switch button{background:none;border:none;color:#AEBBC6;padding:5px 14px;border-radius:99px;font-size:12px;font-weight:700}
+.mode-switch button.on{background:var(--green);color:#fff}
+.icon-btn{background:#2B3B49;border:none;color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700}
+#syncBadge{font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:99px;background:#2B3B49;color:#AEBBC6}
+#syncBadge.ok{background:#12483D;color:#8FE0CC}
+#syncBadge.err{background:#5A241B;color:#F5B3A6}
+
+main{max-width:1080px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;font-weight:900;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card h2 .tag{font-size:10px;font-weight:700;color:var(--sub);border:1px solid var(--line);border-radius:99px;padding:1px 8px}
+
+/* alert cards */
+.alerts{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:14px}
+.alert{border-radius:var(--radius);padding:12px 14px;border:1px solid;font-size:13px}
+.alert.warn{background:var(--amber-soft);border-color:#E8CD9C;color:#7A5210}
+.alert.bad{background:var(--red-soft);border-color:#E7B3A9;color:#8A2F1F}
+.alert b{display:block;font-size:13px;margin-bottom:2px}
+.alert small{opacity:.85}
+.alert-empty{background:var(--green-soft);border:1px solid #BCE0D6;color:#0B5B4B;border-radius:var(--radius);padding:12px 14px;font-size:13px;margin-bottom:14px}
+
+/* candidate table */
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;color:var(--sub);text-align:left;padding:8px 8px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.rowlink{cursor:pointer}
+tr.rowlink:hover{background:#F0F4F2}
+.cname{font-weight:700}
+.cname small{display:block;font-weight:400;color:var(--sub);font-size:11px}
+.chip{display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:2px 10px;white-space:nowrap}
+.chip.g{background:var(--green-soft);color:var(--green)}
+.chip.a{background:var(--amber-soft);color:var(--amber)}
+.chip.r{background:var(--red-soft);color:var(--red)}
+.chip.n{background:#EEF1EF;color:var(--sub)}
+
+/* signature: weekly dot tracker */
+.dots{display:flex;gap:4px;align-items:center}
+.dot{width:14px;height:14px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900}
+.dot.p{background:var(--green);color:#fff}
+.dot.ab{background:var(--red);color:#fff}
+.dot.no{background:#fff;border:1.5px dashed var(--gray-dot)}
+.dots-legend{font-size:11px;color:var(--sub);display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;align-items:center}
+.dots-legend .dot{width:12px;height:12px}
+.pct{font-family:var(--mono);font-weight:500}
+.pct.low{color:var(--red)}
+.pct.mid{color:var(--amber)}
+.pct.hi{color:var(--green)}
+
+.btn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:#fff;color:var(--red);border:1px solid #E7B3A9}
+.btn:disabled{opacity:.5;cursor:default}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:640px){.grid2,.grid3{grid-template-columns:1fr}.hide-sp{display:none}}
+
+.back{background:none;border:none;color:var(--green);font-weight:700;font-size:13px;padding:0;margin-bottom:10px}
+.subtable td{font-size:13px}
+.mono{font-family:var(--mono);font-size:12px}
+.muted{color:var(--sub);font-size:12px}
+.section-note{font-size:12px;color:var(--sub);margin-bottom:10px}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(24,36,48,.5);display:none;align-items:flex-start;justify-content:center;z-index:100;padding:20px;overflow:auto}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;max-width:520px;width:100%;padding:20px;margin-top:4vh}
+.modal h3{font-size:15px;font-weight:900;margin-bottom:14px}
+
+/* candidate self mode */
+.self-hero{background:linear-gradient(135deg,#0E7C66,#0A5D4E);color:#fff;border-radius:var(--radius);padding:18px;margin-bottom:14px}
+.self-hero h2{font-size:18px;font-weight:900}
+.self-hero p{font-size:12px;opacity:.85}
+.lang-switch{display:flex;gap:6px;margin-bottom:12px}
+.lang-switch button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:4px 14px;font-size:12px;font-weight:700;color:var(--sub)}
+.lang-switch button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.radio-row{display:flex;gap:8px;flex-wrap:wrap}
+.radio-row label{flex:1;min-width:110px;border:1.5px solid var(--line);border-radius:10px;padding:10px;text-align:center;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;margin:0}
+.radio-row input{display:none}
+.radio-row label.sel{border-color:var(--green);background:var(--green-soft);color:var(--green)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 20px;border-radius:99px;font-size:13px;font-weight:700;z-index:200;display:none}
+footer{text-align:center;color:var(--sub);font-size:11px;padding:20px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>内定者 学習進捗トラッカー<span>YSタレント</span></h1>
+  <div class="spacer"></div>
+  <span id="syncBadge">未同期</span>
+  <div class="mode-switch">
+    <button id="mStaff" class="on" onclick="setMode('staff')">スタッフ</button>
+    <button id="mSelf" onclick="setMode('self')">本人入力</button>
+  </div>
+  <button class="icon-btn" onclick="openSettings()">⚙ 設定</button>
+</header>
+
+<main id="app"></main>
+<footer>YSタレント株式会社 ― 内定〜入国前の学習・受験進捗を一元管理</footer>
+
+<!-- settings modal -->
+<div class="modal-bg" id="settingsModal">
+  <div class="modal">
+    <h3>同期設定（GitHub）</h3>
+    <p class="muted" style="margin-bottom:12px">リポジトリ内の <b>data.json</b> をGitHub APIで読み書きします。保存前に必ず最新データを取得してマージするため、複数端末で使っても上書き消失しません。</p>
+    <div class="grid2">
+      <div class="field"><label>Owner（ユーザー名）</label><input id="ghOwner" placeholder="tomomaeda-v"></div>
+      <div class="field"><label>リポジトリ名</label><input id="ghRepo" placeholder="yst-naitei-tracker"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>ブランチ</label><input id="ghBranch" placeholder="main" value="main"></div>
+      <div class="field"><label>ファイルパス</label><input id="ghPath" placeholder="data.json" value="data.json"></div>
+    </div>
+    <div class="field"><label>アクセストークン（Fine-grained PAT / Contents: Read&Write）</label><input id="ghToken" type="password" placeholder="github_pat_..."></div>
+    <p class="muted">トークンはこの端末のブラウザにのみ保存されます。候補者の端末には、このリポジトリだけに限定したトークンを設定してください。</p>
+    <div class="btnrow">
+      <button class="btn" onclick="saveSettings()">保存して同期</button>
+      <button class="btn ghost" onclick="loadSample()">サンプルデータ読込</button>
+      <button class="btn ghost" onclick="closeSettings()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- report modal (staff) -->
+<div class="modal-bg" id="reportModal"><div class="modal" id="reportModalBody"></div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= state ================= */
+const LS_DATA='yst_naitei_data', LS_CFG='yst_naitei_cfg', LS_MODE='yst_naitei_mode', LS_SELFID='yst_naitei_selfid', LS_LANG='yst_naitei_lang';
+let DATA = JSON.parse(localStorage.getItem(LS_DATA)||'null') || {updatedAt:null, candidates:[]};
+let CFG  = JSON.parse(localStorage.getItem(LS_CFG)||'null')  || {owner:'',repo:'',branch:'main',path:'data.json',token:''};
+let MODE = localStorage.getItem(LS_MODE)||'staff';
+let LANG = localStorage.getItem(LS_LANG)||'id';
+let VIEW = {page:'dash', cid:null};
+let SYNCING=false;
+
+const uid=()=> 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const today=()=> new Date().toISOString().slice(0,10);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+/* ISO week helpers */
+function isoWeek(d){
+  const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=dt.getUTCDay()||7; dt.setUTCDate(dt.getUTCDate()+4-day);
+  const y=dt.getUTCFullYear();
+  const w=Math.ceil((((dt-Date.UTC(y,0,1))/86400000)+1)/7);
+  return y+'-W'+String(w).padStart(2,'0');
+}
+function lastWeeks(n){
+  const arr=[]; const d=new Date();
+  for(let i=n-1;i>=0;i--){const dd=new Date(d); dd.setDate(d.getDate()-i*7); arr.push(isoWeek(dd));}
+  return arr;
+}
+const thisWeek=()=> isoWeek(new Date());
+
+/* ================= i18n (self mode) ================= */
+const T={
+  ja:{hello:'こんにちは', sub:'今週の学習状況を報告してください', who:'あなたの名前を選んでください',
+      week:'対象週', attend:'荻野先生のオンライン授業', present:'出席した', absent:'欠席した', noclass:'授業なし',
+      reason:'欠席理由', hours:'自主学習時間（時間/週）', content:'学習した内容',
+      app:'知識確認アプリを使った回数（今週）', mock:'模擬試験の点数（50点満点・最新）', mockNone:'未受験は空欄',
+      comment:'コメント・困っていること', send:'報告を送信', sent:'送信しました。お疲れさまでした！',
+      history:'これまでの報告', wk:'週', att:'授業', hrs:'自習', mk:'模試',
+      p:'出席', a:'欠席', n:'—', already:'この週はすでに報告済みです（上書きされます）'},
+  id:{hello:'Halo', sub:'Silakan laporkan progres belajar minggu ini', who:'Pilih nama Anda',
+      week:'Minggu', attend:'Kelas online Ogino-sensei', present:'Hadir', absent:'Tidak hadir', noclass:'Tidak ada kelas',
+      reason:'Alasan tidak hadir', hours:'Jam belajar mandiri (jam/minggu)', content:'Materi yang dipelajari',
+      app:'Berapa kali pakai aplikasi ujian pengetahuan (minggu ini)', mock:'Nilai simulasi ujian (dari 50, terbaru)', mockNone:'Kosongkan jika belum ikut',
+      comment:'Komentar / kesulitan', send:'Kirim laporan', sent:'Laporan terkirim. Terima kasih!',
+      history:'Riwayat laporan', wk:'Minggu', att:'Kelas', hrs:'Mandiri', mk:'Simulasi',
+      p:'Hadir', a:'Absen', n:'—', already:'Minggu ini sudah dilaporkan (akan ditimpa)'}
+};
+
+/* ================= derived metrics ================= */
+function reportOfWeek(c,wk){ return (c.reports||[]).find(r=>r.week===wk); }
+function attendStats(c, weeks){
+  let p=0,a=0,no=0;
+  weeks.forEach(w=>{
+    const r=reportOfWeek(c,w);
+    if(!r||!r.classAttend||r.classAttend==='none') no++;
+    else if(r.classAttend==='present') p++;
+    else a++;
+  });
+  const known=p+a;
+  return {p,a,no,rate: known? Math.round(p/known*100):null};
+}
+function latestMock(c){
+  const rs=(c.reports||[]).filter(r=>r.mockScore!=null&&r.mockScore!=='').sort((x,y)=>y.week.localeCompare(x.week));
+  return rs.length? rs[0].mockScore : null;
+}
+function unreportedStreak(c){
+  const weeks=lastWeeks(8).reverse(); let n=0;
+  for(const w of weeks){ if(w===thisWeek()) continue; if(!reportOfWeek(c,w)) n++; else break; }
+  return n;
+}
+function candidateAlerts(c){
+  const out=[];
+  const st=attendStats(c,lastWeeks(8));
+  if(st.rate!=null && st.rate<70) out.push({lv:'bad', t:`授業出席率 ${st.rate}%`, d:'直近8週の出席率が70%未満'});
+  const streak=unreportedStreak(c);
+  if(streak>=2) out.push({lv:'bad', t:`${streak}週連続 未報告`, d:'週次報告が届いていません'});
+  const mk=latestMock(c);
+  if(mk!=null && mk<45) out.push({lv:'warn', t:`模試 ${mk}/50点`, d:'合格ライン45点に未達'});
+  if(c.ssw && c.ssw.passed===false && !c.ssw.nextDate) out.push({lv:'warn', t:'SSW次回受験日 未設定', d:'再受験の予定を確認してください'});
+  return out;
+}
+
+/* ================= render root ================= */
+function render(){
+  document.getElementById('mStaff').classList.toggle('on',MODE==='staff');
+  document.getElementById('mSelf').classList.toggle('on',MODE==='self');
+  const app=document.getElementById('app');
+  if(MODE==='self'){ app.innerHTML=renderSelf(); bindSelf(); return; }
+  if(VIEW.page==='detail' && VIEW.cid){ app.innerHTML=renderDetail(VIEW.cid); return; }
+  app.innerHTML=renderDash();
+}
+function setMode(m){ MODE=m; localStorage.setItem(LS_MODE,m); VIEW={page:'dash',cid:null}; render(); }
+
+/* ================= staff: dashboard ================= */
+function statusChip(c){
+  const al=candidateAlerts(c);
+  if(al.some(a=>a.lv==='bad')) return '<span class="chip r">要対応</span>';
+  if(al.length) return '<span class="chip a">注意</span>';
+  return '<span class="chip g">順調</span>';
+}
+function dotStrip(c){
+  const weeks=lastWeeks(10);
+  return '<div class="dots">'+weeks.map(w=>{
+    const r=reportOfWeek(c,w);
+    if(!r||!r.classAttend||r.classAttend==='none') return `<span class="dot no" title="${w} 未報告"></span>`;
+    if(r.classAttend==='present') return `<span class="dot p" title="${w} 出席">●</span>`;
+    return `<span class="dot ab" title="${w} 欠席">×</span>`;
+  }).join('')+'</div>';
+}
+function pctCls(r){ return r==null?'':(r<70?'low':(r<85?'mid':'hi')); }
+
+function renderDash(){
+  const cs=DATA.candidates;
+  const allAlerts=[];
+  cs.forEach(c=>candidateAlerts(c).forEach(a=>allAlerts.push({...a,name:c.name||c.code})));
+  const alertsHtml = allAlerts.length
+    ? '<div class="alerts">'+allAlerts.map(a=>`<div class="alert ${a.lv}"><b>${esc(a.name)}：${esc(a.t)}</b><small>${esc(a.d)}</small></div>`).join('')+'</div>'
+    : '<div class="alert-empty">現在アラートはありません。全員の週次報告が揃っています。</div>';
+
+  const rows = cs.map(c=>{
+    const st=attendStats(c,lastWeeks(8));
+    const mk=latestMock(c);
+    const ssw = c.ssw?.passed ? '<span class="chip g">合格</span>'
+      : (c.ssw?.nextDate ? `<span class="chip a">次回 ${esc(c.ssw.nextDate)}</span>` : '<span class="chip n">未合格</span>');
+    return `<tr class="rowlink" onclick="openDetail('${c.id}')">
+      <td class="cname">${esc(c.name||'（名前未設定）')}<small>${esc(c.code||'')} ／ ${esc(c.company||'配属先未定')}</small></td>
+      <td>${statusChip(c)}</td>
+      <td>${dotStrip(c)}</td>
+      <td class="pct ${pctCls(st.rate)}">${st.rate==null?'—':st.rate+'%'}</td>
+      <td class="hide-sp">${mk==null?'<span class="muted">—</span>':`<span class="mono">${mk}/50</span>`}</td>
+      <td class="hide-sp">${ssw}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+  ${alertsHtml}
+  <div class="card">
+    <h2>内定者一覧 <span class="tag">${cs.length}名</span>
+      <span style="flex:1"></span>
+      <button class="btn" style="font-size:12px;padding:7px 14px" onclick="openNewCandidate()">＋ 内定者を追加</button>
+    </h2>
+    ${cs.length? `<div style="overflow-x:auto"><table>
+      <tr><th>氏名 / 配属先</th><th>状態</th><th>授業出席（直近10週）</th><th>出席率</th><th class="hide-sp">模試(最新)</th><th class="hide-sp">SSW</th></tr>
+      ${rows}</table></div>
+      <div class="dots-legend"><span class="dot p" style="position:static"></span>出席　<span class="dot ab"></span>欠席　<span class="dot no"></span>未報告</div>`
+      : '<p class="muted">まだ内定者が登録されていません。「＋ 内定者を追加」から登録してください。</p>'}
+  </div>`;
+}
+
+/* ================= staff: detail ================= */
+function openDetail(id){ VIEW={page:'detail',cid:id}; render(); window.scrollTo(0,0); }
+function backDash(){ VIEW={page:'dash',cid:null}; render(); }
+
+function renderDetail(id){
+  const c=DATA.candidates.find(x=>x.id===id);
+  if(!c) return '<p>見つかりません</p>';
+  const st8=attendStats(c,lastWeeks(8));
+  const alerts=candidateAlerts(c);
+  const reports=[...(c.reports||[])].sort((a,b)=>b.week.localeCompare(a.week));
+  const attempts=[...(c.ssw?.attempts||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  return `
+  <button class="back" onclick="backDash()">← 一覧に戻る</button>
+
+  ${alerts.length? '<div class="alerts">'+alerts.map(a=>`<div class="alert ${a.lv}"><b>${esc(a.t)}</b><small>${esc(a.d)}</small></div>`).join('')+'</div>':''}
+
+  <div class="card">
+    <h2>基本情報 ${statusChip(c)}</h2>
+    <div class="grid3">
+      <div class="field"><label>氏名</label><input value="${esc(c.name)}" onchange="upC('${c.id}','name',this.value)"></div>
+      <div class="field"><label>人材コード</label><input value="${esc(c.code)}" onchange="upC('${c.id}','code',this.value)"></div>
+      <div class="field"><label>配属先企業</label><input value="${esc(c.company)}" onchange="upC('${c.id}','company',this.value)"></div>
+      <div class="field"><label>内定日</label><input type="date" value="${esc(c.naiteiDate)}" onchange="upC('${c.id}','naiteiDate',this.value)"></div>
+      <div class="field"><label>入国予定</label><input type="month" value="${esc(c.entryPlan)}" onchange="upC('${c.id}','entryPlan',this.value)"></div>
+      <div class="field"><label>職種</label><select onchange="upC('${c.id}','sector',this.value)">
+        ${['ドライバー','介護','外食','製造'].map(s=>`<option ${c.sector===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="field"><label>メモ</label><textarea rows="2" onchange="upC('${c.id}','notes',this.value)">${esc(c.notes)}</textarea></div>
+    <div class="btnrow"><button class="btn danger" onclick="delCandidate('${c.id}')">この内定者を削除</button></div>
+  </div>
+
+  <div class="card">
+    <h2>SSW試験 ${c.ssw?.passed?'<span class="chip g">合格</span>':'<span class="chip n">未合格</span>'}</h2>
+    <p class="section-note">スコアは非公開のため本人からの聞き取り値。不合格時は必ず次回受験予定日を設定してください。</p>
+    <div class="grid3">
+      <div class="field"><label>合否</label><select onchange="upSSW('${c.id}','passed',this.value==='1')">
+        <option value="0" ${!c.ssw?.passed?'selected':''}>未合格</option><option value="1" ${c.ssw?.passed?'selected':''}>合格</option></select></div>
+      <div class="field"><label>次回受験予定日</label><input type="date" value="${esc(c.ssw?.nextDate)}" onchange="upSSW('${c.id}','nextDate',this.value)"></div>
+      <div class="field"><label style="opacity:0">追加</label><button class="btn ghost" style="width:100%" onclick="addAttempt('${c.id}')">＋ 受験記録を追加</button></div>
+    </div>
+    ${attempts.length? `<table class="subtable"><tr><th>受験日</th><th>結果</th><th>スコア(本人申告)</th><th>備考</th><th></th></tr>
+      ${attempts.map(a=>`<tr>
+        <td><input type="date" value="${esc(a.date)}" onchange="upAttempt('${c.id}','${a.id}','date',this.value)"></td>
+        <td><select onchange="upAttempt('${c.id}','${a.id}','result',this.value)">
+          <option ${a.result==='不合格'?'selected':''}>不合格</option><option ${a.result==='合格'?'selected':''}>合格</option></select></td>
+        <td><input value="${esc(a.score)}" placeholder="例: A2/B1, 不明" onchange="upAttempt('${c.id}','${a.id}','score',this.value)"></td>
+        <td><input value="${esc(a.note)}" onchange="upAttempt('${c.id}','${a.id}','note',this.value)"></td>
+        <td><button class="btn ghost" style="padding:6px 10px" onclick="delAttempt('${c.id}','${a.id}')">✕</button></td>
+      </tr>`).join('')}</table>` : '<p class="muted">受験記録はまだありません。</p>'}
+  </div>
+
+  <div class="card">
+    <h2>週次学習報告 <span class="tag">直近8週 出席率 ${st8.rate==null?'—':st8.rate+'%'}・未報告 ${st8.no}週</span>
+      <span style="flex:1"></span>
+      <button class="btn" style="font-size:12px;padding:7px 14px" onclick="openReportModal('${c.id}')">＋ 報告を代理入力</button>
+    </h2>
+    ${dotStrip(c)}
+    <div class="dots-legend"><span class="dot p"></span>出席　<span class="dot ab"></span>欠席　<span class="dot no"></span>未報告（左が10週前 → 右が今週）</div>
+    ${reports.length? `<div style="overflow-x:auto;margin-top:12px"><table class="subtable">
+      <tr><th>週</th><th>授業</th><th>欠席理由</th><th>自習(h)</th><th>アプリ回数</th><th>模試</th><th>コメント</th><th>入力者</th><th></th></tr>
+      ${reports.map(r=>`<tr>
+        <td class="mono">${esc(r.week)}</td>
+        <td>${r.classAttend==='present'?'<span class="chip g">出席</span>':r.classAttend==='absent'?'<span class="chip r">欠席</span>':'<span class="chip n">授業なし</span>'}</td>
+        <td>${esc(r.absentReason||'—')}</td>
+        <td class="mono">${esc(r.selfStudyHours??'—')}</td>
+        <td class="mono">${esc(r.appUses??'—')}</td>
+        <td class="mono">${r.mockScore!=null&&r.mockScore!==''?esc(r.mockScore)+'/50':'—'}</td>
+        <td style="max-width:200px">${esc(r.comment||r.studyContent||'')}</td>
+        <td><span class="chip n">${r.by==='candidate'?'本人':'スタッフ'}</span></td>
+        <td><button class="btn ghost" style="padding:6px 10px" onclick="delReport('${c.id}','${r.id}')">✕</button></td>
+      </tr>`).join('')}</table></div>` : '<p class="muted" style="margin-top:10px">報告はまだありません。</p>'}
+  </div>`;
+}
+
+/* ================= mutations ================= */
+function touch(c){ c.updatedAt=new Date().toISOString(); DATA.updatedAt=c.updatedAt; save(); }
+function upC(id,k,v){ const c=DATA.candidates.find(x=>x.id===id); if(!c)return; c[k]=v; touch(c); render(); }
+function upSSW(id,k,v){ const c=DATA.candidates.find(x=>x.id===id); if(!c)return; c.ssw=c.ssw||{passed:false,nextDate:'',attempts:[]}; c.ssw[k]=v; touch(c); render(); }
+function addAttempt(id){ const c=DATA.candidates.find(x=>x.id===id); c.ssw=c.ssw||{passed:false,nextDate:'',attempts:[]}; c.ssw.attempts.push({id:uid(),date:today(),result:'不合格',score:'',note:''}); touch(c); render(); }
+function upAttempt(cid,aid,k,v){ const c=DATA.candidates.find(x=>x.id===cid); const a=c?.ssw?.attempts.find(x=>x.id===aid); if(!a)return; a[k]=v; touch(c); }
+function delAttempt(cid,aid){ const c=DATA.candidates.find(x=>x.id===cid); c.ssw.attempts=c.ssw.attempts.filter(x=>x.id!==aid); touch(c); render(); }
+function delReport(cid,rid){ if(!confirm('この報告を削除しますか？'))return; const c=DATA.candidates.find(x=>x.id===cid); c.reports=(c.reports||[]).filter(r=>r.id!==rid); touch(c); render(); }
+function delCandidate(id){ if(!confirm('この内定者と全報告を削除します。よろしいですか？'))return; DATA.candidates=DATA.candidates.filter(c=>c.id!==id); DATA.updatedAt=new Date().toISOString(); save(); backDash(); }
+function openNewCandidate(){
+  const c={id:uid(),name:'',code:'',company:'',sector:'ドライバー',naiteiDate:today(),entryPlan:'',notes:'',
+    ssw:{passed:false,nextDate:'',attempts:[]},reports:[],updatedAt:new Date().toISOString()};
+  DATA.candidates.push(c); DATA.updatedAt=c.updatedAt; save(); openDetail(c.id);
+}
+
+/* ================= report form (shared) ================= */
+function reportFormHtml(c, lang, isStaff){
+  const t=T[lang]||T.ja;
+  const wk=thisWeek();
+  const exists=reportOfWeek(c,wk);
+  return `
+    ${exists? `<p class="muted" style="margin-bottom:8px">⚠ ${t.already}</p>`:''}
+    <div class="field"><label>${t.week}</label><input id="rf_week" value="${wk}" ${isStaff?'':'readonly'}></div>
+    <div class="field"><label>${t.attend}</label>
+      <div class="radio-row" id="rf_attend">
+        <label data-v="present" onclick="pickAttend(this)">${t.present}</label>
+        <label data-v="absent" onclick="pickAttend(this)">${t.absent}</label>
+        <label data-v="none" onclick="pickAttend(this)">${t.noclass}</label>
+      </div></div>
+    <div class="field"><label>${t.reason}</label><input id="rf_reason" placeholder="—"></div>
+    <div class="grid2">
+      <div class="field"><label>${t.hours}</label><input id="rf_hours" type="number" min="0" step="0.5"></div>
+      <div class="field"><label>${t.app}</label><input id="rf_app" type="number" min="0"></div>
+    </div>
+    <div class="field"><label>${t.mock}</label><input id="rf_mock" type="number" min="0" max="50" placeholder="${t.mockNone}"></div>
+    <div class="field"><label>${t.content}</label><input id="rf_content"></div>
+    <div class="field"><label>${t.comment}</label><textarea id="rf_comment" rows="2"></textarea></div>`;
+}
+let attendVal=null;
+function pickAttend(el){ attendVal=el.dataset.v; [...el.parentNode.children].forEach(x=>x.classList.toggle('sel',x===el)); }
+function collectReport(by){
+  return {id:uid(), week:document.getElementById('rf_week').value||thisWeek(), date:today(), by,
+    classAttend:attendVal, absentReason:document.getElementById('rf_reason').value,
+    selfStudyHours:document.getElementById('rf_hours').value, studyContent:document.getElementById('rf_content').value,
+    appUses:document.getElementById('rf_app').value, mockScore:document.getElementById('rf_mock').value,
+    comment:document.getElementById('rf_comment').value};
+}
+function pushReport(c,r){
+  c.reports=(c.reports||[]).filter(x=>x.week!==r.week); // same week overwritten
+  c.reports.push(r); touch(c);
+}
+
+/* staff modal */
+function openReportModal(cid){
+  attendVal=null;
+  const c=DATA.candidates.find(x=>x.id===cid);
+  const m=document.getElementById('reportModalBody');
+  m.innerHTML=`<h3>週次報告の代理入力：${esc(c.name||c.code)}</h3>${reportFormHtml(c,'ja',true)}
+    <div class="btnrow"><button class="btn" onclick="submitStaffReport('${cid}')">保存</button>
+    <button class="btn ghost" onclick="document.getElementById('reportModal').classList.remove('open')">キャンセル</button></div>`;
+  document.getElementById('reportModal').classList.add('open');
+}
+function submitStaffReport(cid){
+  if(!attendVal){ toast('授業の出欠を選択してください'); return; }
+  const c=DATA.candidates.find(x=>x.id===cid);
+  pushReport(c,collectReport('staff'));
+  document.getElementById('reportModal').classList.remove('open');
+  render(); toast('保存しました'); syncPush();
+}
+
+/* ================= self mode ================= */
+function renderSelf(){
+  const t=T[LANG];
+  const selfId=localStorage.getItem(LS_SELFID)||'';
+  const c=DATA.candidates.find(x=>x.id===selfId);
+  const opts=DATA.candidates.map(x=>`<option value="${x.id}" ${x.id===selfId?'selected':''}>${esc(x.name||x.code)}</option>`).join('');
+  const history=c? [...(c.reports||[])].sort((a,b)=>b.week.localeCompare(a.week)).slice(0,8):[];
+  return `
+  <div class="lang-switch">
+    <button class="${LANG==='id'?'on':''}" onclick="setLang('id')">Bahasa Indonesia</button>
+    <button class="${LANG==='ja'?'on':''}" onclick="setLang('ja')">日本語</button>
+  </div>
+  <div class="self-hero"><h2>${t.hello}${c?', '+esc(c.name||c.code):''} 👋</h2><p>${t.sub}</p></div>
+  <div class="card">
+    <div class="field"><label>${t.who}</label>
+      <select onchange="localStorage.setItem('${LS_SELFID}',this.value);render()"><option value="">—</option>${opts}</select></div>
+    ${c? reportFormHtml(c,LANG,false)+`<div class="btnrow"><button class="btn" style="width:100%;padding:12px" onclick="submitSelfReport('${c.id}')">${t.send}</button></div>`:''}
+  </div>
+  ${c&&history.length? `<div class="card"><h2>${t.history}</h2><table class="subtable">
+    <tr><th>${t.wk}</th><th>${t.att}</th><th>${t.hrs}</th><th>${t.mk}</th></tr>
+    ${history.map(r=>`<tr><td class="mono">${esc(r.week)}</td>
+      <td>${r.classAttend==='present'?`<span class="chip g">${t.p}</span>`:r.classAttend==='absent'?`<span class="chip r">${t.a}</span>`:`<span class="chip n">${t.n}</span>`}</td>
+      <td class="mono">${esc(r.selfStudyHours??'—')}</td>
+      <td class="mono">${r.mockScore!=null&&r.mockScore!==''?esc(r.mockScore)+'/50':'—'}</td></tr>`).join('')}
+  </table></div>`:''}`;
+}
+function bindSelf(){ attendVal=null; }
+function setLang(l){ LANG=l; localStorage.setItem(LS_LANG,l); render(); }
+function submitSelfReport(cid){
+  const t=T[LANG];
+  if(!attendVal){ toast(LANG==='id'?'Pilih kehadiran kelas':'授業の出欠を選択してください'); return; }
+  const c=DATA.candidates.find(x=>x.id===cid);
+  pushReport(c,collectReport('candidate'));
+  render(); toast(t.sent); syncPush();
+}
+
+/* ================= sample data ================= */
+function loadSample(){
+  if(DATA.candidates.length && !confirm('現在のデータにサンプルを追加します。よろしいですか？')) return;
+  const mk=(name,code,company,pat)=>{
+    const weeks=lastWeeks(10);
+    const reports=weeks.map((w,i)=>{
+      const p=pat[i]; if(p==null) return null;
+      return {id:uid(),week:w,date:today(),by:'candidate',
+        classAttend:p===1?'present':'absent', absentReason:p===0?'仕事の都合':'',
+        selfStudyHours:p===1?4:1, studyContent:'交通標識・牽引ルール', appUses:p===1?5:1,
+        mockScore:i===weeks.length-2?(p===1?46:42):'', comment:''};
+    }).filter(Boolean);
+    return {id:uid(),name,code,company,sector:'ドライバー',naiteiDate:'2026-05-20',entryPlan:'2026-10',notes:'',
+      ssw:{passed:name!=='Budi',nextDate:name==='Budi'?'':'',attempts:[{id:uid(),date:'2026-06-10',result:name==='Budi'?'不合格':'合格',score:'本人申告: 不明',note:''}]},
+      reports,updatedAt:new Date().toISOString()};
+  };
+  DATA.candidates.push(
+    mk('Andi','候補者A','東邦運輸',[1,1,1,1,0,1,1,1,1,null]),
+    mk('Budi','候補者B','エコランド',[1,0,0,null,null,0,1,0,null,null]),
+    mk('Citra','候補者C','サンウエイ',[1,1,1,1,1,1,1,1,1,null])
+  );
+  DATA.updatedAt=new Date().toISOString(); save(); closeSettings(); render(); toast('サンプルを読み込みました');
+}
+
+/* ================= persistence & GitHub sync ================= */
+function save(){ localStorage.setItem(LS_DATA,JSON.stringify(DATA)); }
+function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none',2500); }
+function setBadge(txt,cls){ const b=document.getElementById('syncBadge'); b.textContent=txt; b.className=cls||''; }
+
+function b64encode(str){ return btoa(String.fromCharCode(...new TextEncoder().encode(str))); }
+function b64decode(b64){ return new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\n/g,'')),c=>c.charCodeAt(0))); }
+function ghUrl(){ return `https://api.github.com/repos/${CFG.owner}/${CFG.repo}/contents/${CFG.path}?ref=${CFG.branch}`; }
+function ghHeaders(){ return {Authorization:'Bearer '+CFG.token, Accept:'application/vnd.github+json'}; }
+function cfgOk(){ return CFG.owner&&CFG.repo&&CFG.token; }
+
+async function ghFetch(){
+  const res=await fetch(ghUrl(),{headers:ghHeaders(),cache:'no-store'});
+  if(res.status===404) return {sha:null,data:{updatedAt:null,candidates:[]}};
+  if(!res.ok) throw new Error('GitHub取得エラー '+res.status);
+  const j=await res.json();
+  return {sha:j.sha, data:JSON.parse(b64decode(j.content))};
+}
+
+/* merge: candidates by id (newer updatedAt wins for fields), reports union by id + week-dedup */
+function mergeData(remote, local){
+  const map=new Map();
+  (remote.candidates||[]).forEach(c=>map.set(c.id,c));
+  (local.candidates||[]).forEach(lc=>{
+    const rc=map.get(lc.id);
+    if(!rc){ map.set(lc.id,lc); return; }
+    const newer=(lc.updatedAt||'')>=(rc.updatedAt||'')? lc:rc;
+    const older=newer===lc? rc:lc;
+    const merged={...older,...newer};
+    // union reports
+    const rmap=new Map();
+    [...(older.reports||[]),...(newer.reports||[])].forEach(r=>{
+      const key=r.week+'|'+(r.by||'');
+      const ex=rmap.get(key);
+      if(!ex||(r.date||'')>=(ex.date||'')) rmap.set(key,r);
+    });
+    merged.reports=[...rmap.values()];
+    // union attempts
+    const amap=new Map();
+    [...(older.ssw?.attempts||[]),...(newer.ssw?.attempts||[])].forEach(a=>amap.set(a.id,a));
+    merged.ssw={...(older.ssw||{}),...(newer.ssw||{}),attempts:[...amap.values()]};
+    map.set(lc.id,merged);
+  });
+  return {updatedAt:new Date().toISOString(), candidates:[...map.values()]};
+}
+
+async function syncPull(){
+  if(!cfgOk()){ setBadge('未設定'); return; }
+  try{
+    setBadge('同期中…');
+    const {data}=await ghFetch();
+    DATA=mergeData(data,DATA); save(); render();
+    setBadge('同期済 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),'ok');
+  }catch(e){ console.error(e); setBadge('同期失敗','err'); toast('同期に失敗しました: '+e.message); }
+}
+
+async function syncPush(){
+  if(!cfgOk()||SYNCING) return;
+  SYNCING=true;
+  try{
+    setBadge('保存中…');
+    // ALWAYS re-fetch latest & merge before writing (prevents overwrite loss)
+    const {sha,data}=await ghFetch();
+    DATA=mergeData(data,DATA); save(); render();
+    const body={message:'update data '+new Date().toISOString(), branch:CFG.branch,
+      content:b64encode(JSON.stringify(DATA,null,2))};
+    if(sha) body.sha=sha;
+    const res=await fetch(ghUrl().split('?')[0],{method:'PUT',headers:{...ghHeaders(),'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(res.status===409){ SYNCING=false; return syncPush(); } // sha conflict → retry with fresh sha
+    if(!res.ok) throw new Error('GitHub保存エラー '+res.status);
+    setBadge('同期済 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),'ok');
+  }catch(e){ console.error(e); setBadge('同期失敗','err'); toast('保存の同期に失敗: '+e.message+'（データは端末に保存済み）'); }
+  finally{ SYNCING=false; }
+}
+
+/* debounce push on edits */
+let pushTimer=null;
+const _origSave=save;
+save=function(){ _origSave(); clearTimeout(pushTimer); pushTimer=setTimeout(syncPush,2000); };
+
+/* ================= settings ================= */
+function openSettings(){
+  document.getElementById('ghOwner').value=CFG.owner;
+  document.getElementById('ghRepo').value=CFG.repo;
+  document.getElementById('ghBranch').value=CFG.branch;
+  document.getElementById('ghPath').value=CFG.path;
+  document.getElementById('ghToken').value=CFG.token;
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
+function saveSettings(){
+  CFG={owner:document.getElementById('ghOwner').value.trim(), repo:document.getElementById('ghRepo').value.trim(),
+    branch:document.getElementById('ghBranch').value.trim()||'main', path:document.getElementById('ghPath').value.trim()||'data.json',
+    token:document.getElementById('ghToken').value.trim()};
+  localStorage.setItem(LS_CFG,JSON.stringify(CFG));
+  closeSettings(); syncPull();
+}
+
+/* ================= init ================= */
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+render();
+if(cfgOk()) syncPull();
+</script>
+</body>
+</html>

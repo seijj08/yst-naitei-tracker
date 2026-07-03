@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-07-03T12:21:38.414Z",
+  "updatedAt": "2026-07-03T12:21:40.879Z",
   "candidates": [
     {
       "id": "xmr4wk3qca44nu",
-      "name": "n",
+      "name": "",
       "code": "",
       "company": "",
       "sector": "ドライバー",
@@ -16,7 +16,7 @@
         "attempts": []
       },
       "reports": [],
-      "updatedAt": "2026-07-03T12:21:35.962Z"
+      "updatedAt": "2026-07-03T12:21:40.879Z"
     }
   ]
 }

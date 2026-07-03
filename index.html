@@ -561,7 +561,7 @@ async function syncPull(){
   try{
     setBadge('同期中…');
     const {data}=await ghFetch();
-    DATA=mergeData(data,DATA); save(); render();
+    DATA=mergeData(data,DATA); rawSave(); safeRender();
     setBadge('同期済 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),'ok');
   }catch(e){ console.error(e); setBadge('同期失敗','err'); toast('同期に失敗しました: '+e.message); }
 }
@@ -573,7 +573,7 @@ async function syncPush(){
     setBadge('保存中…');
     // ALWAYS re-fetch latest & merge before writing (prevents overwrite loss)
     const {sha,data}=await ghFetch();
-    DATA=mergeData(data,DATA); save(); render();
+    DATA=mergeData(data,DATA); rawSave(); safeRender();
     const body={message:'update data '+new Date().toISOString(), branch:CFG.branch,
       content:b64encode(JSON.stringify(DATA,null,2))};
     if(sha) body.sha=sha;
@@ -585,10 +585,17 @@ async function syncPush(){
   finally{ SYNCING=false; }
 }
 
-/* debounce push on edits */
+/* debounce push on edits (10s after the LAST edit; typing resets the timer) */
 let pushTimer=null;
-const _origSave=save;
-save=function(){ _origSave(); clearTimeout(pushTimer); pushTimer=setTimeout(syncPush,2000); };
+const rawSave=save;
+save=function(){ rawSave(); clearTimeout(pushTimer); pushTimer=setTimeout(syncPush,10000); };
+
+/* never rebuild the screen while the user is typing in a field */
+function safeRender(){
+  const el=document.activeElement;
+  if(el && ['INPUT','TEXTAREA','SELECT'].includes(el.tagName)) return;
+  render();
+}
 
 /* ================= settings ================= */
 function openSettings(){

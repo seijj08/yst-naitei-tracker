@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-07-03T12:22:05.600Z",
+  "updatedAt": "2026-07-03T12:22:08.075Z",
   "candidates": [
     {
       "id": "xmr4wk3qca44nu",
       "name": "",
       "code": "",
-      "company": "",
+      "company": "sa",
       "sector": "ドライバー",
       "naiteiDate": "2026-07-03",
       "entryPlan": "",
@@ -16,7 +16,7 @@
         "attempts": []
       },
       "reports": [],
-      "updatedAt": "2026-07-03T12:21:40.879Z"
+      "updatedAt": "2026-07-03T12:22:08.075Z"
     }
   ]
 }

@@ -86,6 +86,14 @@ tr.rowlink:hover{background:#F0F4F2}
 @media(max-width:640px){.grid2,.grid3{grid-template-columns:1fr}.hide-sp{display:none}}
 
 .back{background:none;border:none;color:var(--green);font-weight:700;font-size:13px;padding:0;margin-bottom:10px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 18px;font-size:13px;font-weight:700;color:var(--sub)}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.bars{display:flex;gap:3px;align-items:flex-end;height:30px}
+.bar{width:10px;border-radius:3px 3px 0 0;display:inline-block}
+.bar.g{background:var(--green)}
+.bar.a{background:var(--amber)}
+.bar.r{background:var(--red)}
 .subtable td{font-size:13px}
 .mono{font-family:var(--mono);font-size:12px}
 .muted{color:var(--sub);font-size:12px}
@@ -193,14 +201,18 @@ const T={
       app:'知識確認アプリを使った回数（今週）', mock:'模擬試験の点数（50点満点・最新）', mockNone:'未受験は空欄',
       comment:'コメント・困っていること', send:'報告を送信', sent:'送信しました。お疲れさまでした！',
       history:'これまでの報告', wk:'週', att:'授業', hrs:'自習', mk:'模試',
-      p:'出席', a:'欠席', n:'—', already:'この週はすでに報告済みです（上書きされます）'},
+      p:'出席', a:'欠席', n:'—', already:'この週はすでに報告済みです（上書きされます）',
+      mockTitle:'模擬試験の点数を記録', mockDate:'受験日', mockScoreLbl:'点数（50点満点）', mockSave:'記録する',
+      mockHist:'模擬試験の記録', mockSent:'記録しました！', mockNeed:'受験日と点数を入力してください'},
   id:{hello:'Halo', sub:'Silakan laporkan progres belajar minggu ini', who:'Pilih nama Anda',
       week:'Minggu', attend:'Kelas online Ogino-sensei', present:'Hadir', absent:'Tidak hadir', noclass:'Tidak ada kelas',
       reason:'Alasan tidak hadir', hours:'Jam belajar mandiri (jam/minggu)', content:'Materi yang dipelajari',
       app:'Berapa kali pakai aplikasi ujian pengetahuan (minggu ini)', mock:'Nilai simulasi ujian (dari 50, terbaru)', mockNone:'Kosongkan jika belum ikut',
       comment:'Komentar / kesulitan', send:'Kirim laporan', sent:'Laporan terkirim. Terima kasih!',
       history:'Riwayat laporan', wk:'Minggu', att:'Kelas', hrs:'Mandiri', mk:'Simulasi',
-      p:'Hadir', a:'Absen', n:'—', already:'Minggu ini sudah dilaporkan (akan ditimpa)'}
+      p:'Hadir', a:'Absen', n:'—', already:'Minggu ini sudah dilaporkan (akan ditimpa)',
+      mockTitle:'Catat nilai simulasi ujian', mockDate:'Tanggal ujian', mockScoreLbl:'Nilai (dari 50)', mockSave:'Simpan',
+      mockHist:'Riwayat simulasi ujian', mockSent:'Tersimpan!', mockNeed:'Isi tanggal dan nilai'}
 };
 
 /* ================= derived metrics ================= */
@@ -216,9 +228,21 @@ function attendStats(c, weeks){
   const known=p+a;
   return {p,a,no,rate: known? Math.round(p/known*100):null};
 }
-function latestMock(c){
+function mockList(c){ return [...(c.mockTests||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||'')); }
+function latestMockEntry(c){
+  const m=mockList(c)[0]; if(m) return m;
   const rs=(c.reports||[]).filter(r=>r.mockScore!=null&&r.mockScore!=='').sort((x,y)=>y.week.localeCompare(x.week));
-  return rs.length? rs[0].mockScore : null;
+  return rs.length? {date:rs[0].week, score:rs[0].mockScore} : null;
+}
+function latestMock(c){ const e=latestMockEntry(c); return e==null? null : Number(e.score); }
+function bestMock(c){ const l=mockList(c); return l.length? Math.max(...l.map(m=>Number(m.score)||0)) : null; }
+function mockBars(c,n=6){
+  const l=mockList(c).slice(0,n).reverse();
+  if(!l.length) return '<span class="muted">記録なし</span>';
+  return '<div class="bars">'+l.map(m=>{
+    const s=Number(m.score)||0, h=Math.max(4,Math.round(s/50*28)), cl=s>=45?'g':(s>=40?'a':'r');
+    return `<span class="bar ${cl}" style="height:${h}px" title="${esc(m.date)} ${s}点"></span>`;
+  }).join('')+'</div>';
 }
 function unreportedStreak(c){
   const weeks=lastWeeks(8).reverse(); let n=0;
@@ -244,7 +268,14 @@ function render(){
   const app=document.getElementById('app');
   if(MODE==='self'){ app.innerHTML=renderSelf(); bindSelf(); return; }
   if(VIEW.page==='detail' && VIEW.cid){ app.innerHTML=renderDetail(VIEW.cid); return; }
-  app.innerHTML=renderDash();
+  if(VIEW.page==='knowledge'){ app.innerHTML=renderTabs()+renderKnowledge(); return; }
+  app.innerHTML=renderTabs()+renderDash();
+}
+function renderTabs(){
+  return `<div class="tabs">
+    <button class="${VIEW.page!=='knowledge'?'on':''}" onclick="VIEW={page:'dash',cid:null};render()">ダッシュボード</button>
+    <button class="${VIEW.page==='knowledge'?'on':''}" onclick="VIEW={page:'knowledge',cid:null};render()">知識確認</button>
+  </div>`;
 }
 function setMode(m){ MODE=m; localStorage.setItem(LS_MODE,m); VIEW={page:'dash',cid:null}; render(); }
 
@@ -315,6 +346,7 @@ function renderDetail(id){
   const alerts=candidateAlerts(c);
   const reports=[...(c.reports||[])].sort((a,b)=>b.week.localeCompare(a.week));
   const attempts=[...(c.ssw?.attempts||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const mocks=mockList(c);
 
   return `
   <button class="back" onclick="backDash()">← 一覧に戻る</button>
@@ -358,6 +390,24 @@ function renderDetail(id){
   </div>
 
   <div class="card">
+    <h2>知識確認 模擬試験 <span class="tag">最新 ${latestMockEntry(c)? esc(latestMockEntry(c).score)+'/50（'+esc(latestMockEntry(c).date)+'）':'記録なし'}</span>
+      <span style="flex:1"></span>
+      <button class="btn" style="font-size:12px;padding:7px 14px" onclick="openMockModal('${c.id}')">＋ 記録を追加</button>
+    </h2>
+    ${mockBars(c,10)}
+    ${mocks.length? `<div style="overflow-x:auto;margin-top:12px"><table class="subtable">
+      <tr><th>受験日</th><th>点数</th><th>判定</th><th>メモ</th><th>入力者</th><th></th></tr>
+      ${mocks.map(m=>{const s=Number(m.score)||0;return `<tr>
+        <td class="mono">${esc(m.date)}</td>
+        <td class="mono">${esc(m.score)}/50</td>
+        <td>${s>=45?'<span class="chip g">合格圏</span>':(s>=40?'<span class="chip a">あと'+(45-s)+'点</span>':'<span class="chip r">要強化</span>')}</td>
+        <td style="max-width:220px">${esc(m.note||'')}</td>
+        <td><span class="chip n">${m.by==='candidate'?'本人':'スタッフ'}</span></td>
+        <td><button class="btn ghost" style="padding:6px 10px" onclick="delMock('${c.id}','${m.id}')">✕</button></td>
+      </tr>`}).join('')}</table></div>` : '<p class="muted" style="margin-top:10px">記録はまだありません。「＋ 記録を追加」から入力してください。</p>'}
+  </div>
+
+  <div class="card">
     <h2>週次学習報告 <span class="tag">直近8週 出席率 ${st8.rate==null?'—':st8.rate+'%'}・未報告 ${st8.no}週</span>
       <span style="flex:1"></span>
       <button class="btn" style="font-size:12px;padding:7px 14px" onclick="openReportModal('${c.id}')">＋ 報告を代理入力</button>
@@ -378,6 +428,58 @@ function renderDetail(id){
         <td><button class="btn ghost" style="padding:6px 10px" onclick="delReport('${c.id}','${r.id}')">✕</button></td>
       </tr>`).join('')}</table></div>` : '<p class="muted" style="margin-top:10px">報告はまだありません。</p>'}
   </div>`;
+}
+
+/* ================= staff: knowledge test page ================= */
+function renderKnowledge(){
+  const rows=DATA.candidates.map(c=>{
+    const l=mockList(c), la=latestMockEntry(c), best=bestMock(c);
+    const laHtml = la? `<span class="mono pct ${Number(la.score)>=45?'hi':(Number(la.score)>=40?'mid':'low')}">${esc(la.score)}/50</span><br><small class="muted">${esc(la.date)}</small>` : '<span class="muted">記録なし</span>';
+    return `<tr>
+      <td class="cname rowlink" onclick="openDetail('${c.id}')">${esc(c.name||'（名前未設定）')}<small>${esc(c.code||'')} ／ ${esc(c.company||'配属先未定')}</small></td>
+      <td class="mono">${l.length}回</td>
+      <td>${laHtml}</td>
+      <td class="mono">${best==null?'—':best+'/50'}</td>
+      <td>${mockBars(c)}</td>
+      <td><button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="openMockModal('${c.id}')">＋ 記録</button></td>
+    </tr>`;
+  }).join('');
+  return `<div class="card">
+    <h2>知識確認（模擬試験）の進捗 <span class="tag">合格ライン 45/50</span></h2>
+    <p class="section-note">対策アプリで受けた模擬試験の「点数」と「受験日」を記録します。推移バーは直近6回（緑=45点以上／黄=40〜44点／赤=40点未満）。氏名をタップすると個人詳細に移動します。</p>
+    ${DATA.candidates.length? `<div style="overflow-x:auto"><table>
+      <tr><th>氏名 / 配属先</th><th>受験回数</th><th>最新スコア</th><th>最高</th><th>推移（直近6回）</th><th></th></tr>
+      ${rows}</table></div>` : '<p class="muted">内定者が登録されていません。ダッシュボードから追加してください。</p>'}
+  </div>`;
+}
+function openMockModal(cid){
+  const c=DATA.candidates.find(x=>x.id===cid);
+  const m=document.getElementById('reportModalBody');
+  m.innerHTML=`<h3>模擬試験の記録：${esc(c.name||c.code)}</h3>
+    <div class="grid2">
+      <div class="field"><label>受験日</label><input type="date" id="mk_date" value="${today()}"></div>
+      <div class="field"><label>点数（50点満点）</label><input type="number" id="mk_score" min="0" max="50" placeholder="例: 44"></div>
+    </div>
+    <div class="field"><label>メモ（間違えた分野など・任意）</label><input id="mk_note" placeholder="例: 標識・牽引ルールで失点"></div>
+    <div class="btnrow"><button class="btn" onclick="submitMock('${cid}')">保存</button>
+    <button class="btn ghost" onclick="document.getElementById('reportModal').classList.remove('open')">キャンセル</button></div>`;
+  document.getElementById('reportModal').classList.add('open');
+}
+function submitMock(cid){
+  const d=document.getElementById('mk_date').value, s=document.getElementById('mk_score').value;
+  if(!d || s===''){ toast('受験日と点数を入力してください'); return; }
+  const c=DATA.candidates.find(x=>x.id===cid);
+  c.mockTests=c.mockTests||[];
+  c.mockTests.push({id:uid(), date:d, score:Number(s), note:document.getElementById('mk_note').value, by:'staff'});
+  touch(c);
+  document.getElementById('reportModal').classList.remove('open');
+  render(); toast('保存しました');
+}
+function delMock(cid,mid){
+  if(!confirm('この模擬試験記録を削除しますか？')) return;
+  const c=DATA.candidates.find(x=>x.id===cid);
+  c.mockTests=(c.mockTests||[]).filter(m=>m.id!==mid);
+  touch(c); render();
 }
 
 /* ================= mutations ================= */
@@ -414,7 +516,7 @@ function reportFormHtml(c, lang, isStaff){
       <div class="field"><label>${t.hours}</label><input id="rf_hours" type="number" min="0" step="0.5"></div>
       <div class="field"><label>${t.app}</label><input id="rf_app" type="number" min="0"></div>
     </div>
-    <div class="field"><label>${t.mock}</label><input id="rf_mock" type="number" min="0" max="50" placeholder="${t.mockNone}"></div>
+    <div class="field" style="display:none"><label>${t.mock}</label><input id="rf_mock" type="number" min="0" max="50" placeholder="${t.mockNone}"></div>
     <div class="field"><label>${t.content}</label><input id="rf_content"></div>
     <div class="field"><label>${t.comment}</label><textarea id="rf_comment" rows="2"></textarea></div>`;
 }
@@ -468,6 +570,15 @@ function renderSelf(){
       <select onchange="localStorage.setItem('${LS_SELFID}',this.value);render()"><option value="">—</option>${opts}</select></div>
     ${c? reportFormHtml(c,LANG,false)+`<div class="btnrow"><button class="btn" style="width:100%;padding:12px" onclick="submitSelfReport('${c.id}')">${t.send}</button></div>`:''}
   </div>
+  ${c? `<div class="card"><h2>${t.mockTitle} <span class="tag">45/50 →✅</span></h2>
+    <div class="grid2">
+      <div class="field"><label>${t.mockDate}</label><input type="date" id="sm_date" value="${today()}"></div>
+      <div class="field"><label>${t.mockScoreLbl}</label><input type="number" id="sm_score" min="0" max="50"></div>
+    </div>
+    <button class="btn" style="width:100%" onclick="submitSelfMock('${c.id}')">${t.mockSave}</button>
+    ${mockList(c).length? `<table class="subtable" style="margin-top:12px"><tr><th>${t.mockDate}</th><th>${t.mockScoreLbl}</th></tr>
+      ${mockList(c).slice(0,8).map(m=>{const s=Number(m.score)||0;return `<tr><td class="mono">${esc(m.date)}</td><td class="mono ${s>=45?'pct hi':(s>=40?'pct mid':'pct low')}">${esc(m.score)}/50</td></tr>`}).join('')}</table>`:''}
+  </div>`:''}
   ${c&&history.length? `<div class="card"><h2>${t.history}</h2><table class="subtable">
     <tr><th>${t.wk}</th><th>${t.att}</th><th>${t.hrs}</th><th>${t.mk}</th></tr>
     ${history.map(r=>`<tr><td class="mono">${esc(r.week)}</td>
@@ -484,6 +595,15 @@ function submitSelfReport(cid){
   const c=DATA.candidates.find(x=>x.id===cid);
   pushReport(c,collectReport('candidate'));
   render(); toast(t.sent); syncPush();
+}
+function submitSelfMock(cid){
+  const t=T[LANG];
+  const d=document.getElementById('sm_date').value, s=document.getElementById('sm_score').value;
+  if(!d || s===''){ toast(t.mockNeed); return; }
+  const c=DATA.candidates.find(x=>x.id===cid);
+  c.mockTests=c.mockTests||[];
+  c.mockTests.push({id:uid(), date:d, score:Number(s), note:'', by:'candidate'});
+  touch(c); render(); toast(t.mockSent); syncPush();
 }
 
 /* ================= sample data ================= */
@@ -551,6 +671,10 @@ function mergeData(remote, local){
     const amap=new Map();
     [...(older.ssw?.attempts||[]),...(newer.ssw?.attempts||[])].forEach(a=>amap.set(a.id,a));
     merged.ssw={...(older.ssw||{}),...(newer.ssw||{}),attempts:[...amap.values()]};
+    // union mock tests
+    const mmap=new Map();
+    [...(older.mockTests||[]),...(newer.mockTests||[])].forEach(m=>mmap.set(m.id,m));
+    merged.mockTests=[...mmap.values()];
     map.set(lc.id,merged);
   });
   return {updatedAt:new Date().toISOString(), candidates:[...map.values()]};

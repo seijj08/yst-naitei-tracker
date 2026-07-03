@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-03T12:29:32.148Z",
+  "updatedAt": "2026-07-03T12:29:35.462Z",
   "candidates": [
     {
       "id": "xmr4wk3qca44nu",
@@ -17,6 +17,23 @@
       },
       "reports": [],
       "updatedAt": "2026-07-03T12:22:08.075Z"
+    },
+    {
+      "id": "xmr4wulchajfuk",
+      "name": "",
+      "code": "",
+      "company": "",
+      "sector": "ドライバー",
+      "naiteiDate": "2026-07-03",
+      "entryPlan": "",
+      "notes": "",
+      "ssw": {
+        "passed": false,
+        "nextDate": "",
+        "attempts": []
+      },
+      "reports": [],
+      "updatedAt": "2026-07-03T12:29:32.945Z"
     }
   ]
 }
